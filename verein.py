@@ -8,7 +8,7 @@ app.secret_key = os.urandom(24)
 
 DB_NAME = "vereinsdaten.db"
 # ÄNDERE DIESES PASSWORT FÜR DEINEN LOGIN:
-ADMIN_PASSWORD = "mein-sicheres-passwort" 
+ADMIN_PASSWORD = "1234" 
 
 # --- DATENBANK-LOGIK ---
 def init_db():
