@@ -14,13 +14,11 @@ def get_db():
 
 def init_db():
     conn = get_db(); cur = conn.cursor()
-    # Falls die Spalte 'email' fehlt, löschen wir die Tabelle einmalig komplett
     try:
         cur.execute("SELECT email FROM mitglieder LIMIT 1")
     except:
         conn.rollback()
         cur.execute('DROP TABLE IF EXISTS mitglieder')
-    
     cur.execute('''CREATE TABLE IF NOT EXISTS mitglieder 
                  (id SERIAL PRIMARY KEY, vorname TEXT, nachname TEXT, email TEXT UNIQUE, 
                   geburtstag TEXT, eintritt TEXT, passwort TEXT, rolle TEXT DEFAULT 'USER')''')
@@ -51,9 +49,13 @@ def index():
     u = cur.fetchone(); cur.close(); conn.close()
     
     if session.get('is_admin'):
-        res = f'<div class="card p-4"><h3>Admin-Zentrale</h3><p>Willkommen, {session["user"]}</p><a href="/mitglieder" class="btn btn-primary">Mitglieder verwalten</a></div>'
+        res = f'<div class="card p-4"><h3>Admin-Zentrale</h3><p>Willkommen, {session["user"]}</p><div class="list-group"><a href="/mitglieder" class="list-group-item list-group-item-action">Mitglieder verwalten</a></div></div>'
     elif u:
-        res = f'<div class="card p-4"><h3>Mein Profil</h3><p><b>Name:</b> {u[0]} {u[1]}</p><p><b>Email:</b> {u[2]}</p><p><b>Geburtstag:</b> {u[3]}</p><p><b>Eintritt:</b> {u[4]}</p></div>'
+        res = f'''<div class="card p-4"><h3>Mein Profil</h3><p><b>Name:</b> {u[0]} {u[1]}</p><p><b>Email:</b> {u[2]}</p>
+        <p><b>Geburtstag:</b> {u[3]}</p><p><b>Eintritt:</b> {u[4]}</p><hr>
+        <form action="/pw_self" method="POST" style="max-width:300px"><h5>Passwort ändern</h5>
+        <input name="n" type="password" class="form-control mb-2" placeholder="Neues Passwort" required>
+        <button class="btn btn-primary btn-sm">Speichern</button></form></div>'''
     else: res = "Profil nicht gefunden."
     return render_template_string(LAYOUT, c=res)
 
@@ -68,7 +70,7 @@ def login():
         r = cur.fetchone(); cur.close(); conn.close()
         if r and check_password_hash(r[0], p):
             session.update({'logged_in':True, 'is_admin':False, 'user':e}); return redirect('/')
-    return render_template_string(LAYOUT, c='<form method="POST" class="card p-4 mx-auto" style="max-width:400px"><h4 class="text-center mb-3">Login</h4><input name="e" class="form-control mb-2" placeholder="E-Mail"><input type="password" name="p" class="form-control mb-3" placeholder="Passwort"><button class="btn btn-primary w-100">Anmelden</button></form>')
+    return render_template_string(LAYOUT, c='<div class="row justify-content-center mt-5"><div class="col-md-4"><form method="POST" class="card p-4 shadow-sm"><h4 class="text-center mb-3">Login</h4><input name="e" class="form-control mb-2" placeholder="E-Mail" required><input type="password" name="p" class="form-control mb-3" placeholder="Passwort" required><button class="btn btn-primary w-100">Anmelden</button></form></div></div>')
 
 @app.route('/mitglieder')
 def mitglieder():
@@ -76,34 +78,46 @@ def mitglieder():
     conn = get_db(); cur = conn.cursor()
     cur.execute("SELECT id, vorname, nachname, email FROM mitglieder ORDER BY nachname")
     ml = cur.fetchall(); cur.close(); conn.close()
-    rows = "".join([f"<tr><td>{m[1]} {m[2]}</td><td>{m[3]}</td><td><a href='/del_m/{m[0]}' class='text-danger'>Löschen</a></td></tr>" for m in ml])
-    content = f'''<div class="card p-4 mb-3"><h4>Neu anlegen</h4>
+    rows = "".join([f"<tr><td>{m[1]} {m[2]}</td><td>{m[3]}</td><td class='text-end'><a href='/del_m/{m[0]}' class='btn btn-sm btn-outline-danger'>Löschen</a></td></tr>" for m in ml])
+    content = f'''<div class="card p-4 mb-3 shadow-sm"><h4>Neues Mitglied anlegen</h4>
     <form action="/add_m" method="POST" class="row g-2">
-    <div class="col-6"><input name="v" class="form-control" placeholder="Vorname"></div>
-    <div class="col-6"><input name="n" class="form-control" placeholder="Nachname"></div>
-    <div class="col-12"><input name="e" class="form-control" placeholder="E-Mail"></div>
-    <div class="col-6"><label class="small">Geburtstag</label><input name="g" type="date" class="form-control"></div>
-    <div class="col-6"><label class="small">Eintritt</label><input name="ein" type="date" class="form-control"></div>
-    <button class="btn btn-success mt-3">Mitglied speichern</button></form></div>
-    <table class="table card">{rows}</table>'''
+    <div class="col-md-6"><label class="small">Vorname</label><input name="v" class="form-control" required></div>
+    <div class="col-md-6"><label class="small">Nachname</label><input name="n" class="form-control" required></div>
+    <div class="col-md-12"><label class="small">E-Mail (Login)</label><input name="e" type="email" class="form-control" required></div>
+    <div class="col-md-6"><label class="small">Geburtstag</label><input name="g" type="date" class="form-control"></div>
+    <div class="col-md-6"><label class="small">Eintritt am</label><input name="ein" type="date" class="form-control"></div>
+    <div class="col-12 mt-3"><button class="btn btn-success w-100">Mitglied speichern</button></div></form></div>
+    <div class="card shadow-sm"><table class="table mb-0">{rows}</table></div>'''
     return render_template_string(LAYOUT, c=content)
 
 @app.route('/add_m', methods=['POST'])
 def add_m():
     if not session.get('is_admin'): return redirect('/')
     h = generate_password_hash("querfeldein2025")
-    c = get_db(); cur = c.cursor()
-    cur.execute("INSERT INTO mitglieder (vorname, nachname, email, geburtstag, eintritt, passwort) VALUES (%s,%s,%s,%s,%s,%s)", 
-                (request.form['v'], request.form['n'], request.form['e'], request.form['g'], request.form['ein'], h))
-    c.commit(); cur.close(); conn.close(); return redirect('/mitglieder')
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("INSERT INTO mitglieder (vorname, nachname, email, geburtstag, eintritt, passwort) VALUES (%s,%s,%s,%s,%s,%s)", 
+                    (request.form['v'], request.form['n'], request.form['e'], request.form.get('g', ''), request.form.get('ein', ''), h))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e: return f"Fehler beim Speichern: {str(e)}"
+    return redirect('/mitglieder')
 
-@app.route('/logout')
-def logout(): session.clear(); return redirect('/login')
+@app.route('/pw_self', methods=['POST'])
+def pw_self():
+    if not session.get('logged_in'): return redirect('/login')
+    h = generate_password_hash(request.form.get('n'))
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("UPDATE mitglieder SET passwort=%s WHERE email=%s", (h, session['user']))
+    conn.commit(); cur.close(); conn.close(); return redirect('/')
 
 @app.route('/del_m/<int:id>')
 def del_m(id):
     if not session.get('is_admin'): return redirect('/')
-    c = get_db(); cur = c.cursor(); cur.execute("DELETE FROM mitglieder WHERE id=%s", (id,)); c.commit(); return redirect('/mitglieder')
+    conn = get_db(); cur = conn.cursor()
+    cur.execute("DELETE FROM mitglieder WHERE id=%s", (id,)); conn.commit(); cur.close(); conn.close(); return redirect('/mitglieder')
+
+@app.route('/logout')
+def logout(): session.clear(); return redirect('/login')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
