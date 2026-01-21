@@ -14,10 +14,21 @@ def get_db():
 
 def init_db():
     conn = get_db(); cur = conn.cursor()
-    # Mitglieder Tabelle erweitert
+    # ACHTUNG: Die nächste Zeile löscht die alte Mitglieder-Tabelle einmalig, 
+    # damit die neuen Spalten (Email, Passwort etc.) sauber angelegt werden.
+    # cur.execute('DROP TABLE IF EXISTS mitglieder') 
+    
+    # Tabelle mit allen neuen Feldern anlegen
     cur.execute('''CREATE TABLE IF NOT EXISTS mitglieder 
-                 (id SERIAL PRIMARY KEY, vorname TEXT, nachname TEXT, email TEXT UNIQUE, 
-                  geburtstag DATE, eintritt DATE, passwort TEXT, rolle TEXT DEFAULT 'USER')''')
+                 (id SERIAL PRIMARY KEY, 
+                  vorname TEXT, 
+                  nachname TEXT, 
+                  email TEXT UNIQUE, 
+                  geburtstag TEXT, 
+                  eintritt TEXT, 
+                  passwort TEXT, 
+                  rolle TEXT DEFAULT 'USER')''')
+    
     cur.execute('CREATE TABLE IF NOT EXISTS finanzen (id SERIAL PRIMARY KEY, zweck TEXT, betrag DECIMAL, typ TEXT, datum DATE DEFAULT CURRENT_DATE)')
     conn.commit(); cur.close(); conn.close()
 
