@@ -16,7 +16,7 @@ def init_db():
     conn = get_db(); cur = conn.cursor()
     # ACHTUNG: Die nächste Zeile löscht die alte Mitglieder-Tabelle einmalig, 
     # damit die neuen Spalten (Email, Passwort etc.) sauber angelegt werden.
-    # cur.execute('DROP TABLE IF EXISTS mitglieder') 
+     cur.execute('DROP TABLE IF EXISTS mitglieder') 
     
     # Tabelle mit allen neuen Feldern anlegen
     cur.execute('''CREATE TABLE IF NOT EXISTS mitglieder 
